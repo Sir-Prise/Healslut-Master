@@ -16,7 +16,7 @@ from pyautogui import screenshot
 from random import randint
 
 import HypnoTherapy
-import OWVibe
+import ow_on_fire_monitor
 import OWKillfeedMonitor
 import LoLKillfeedMonitor
 import WordSearch
@@ -170,7 +170,6 @@ class HealslutMaster(Frame):
 		self.RulesOkay = False
 		self.ActionMenuOpen = False
 		self.WSActive = False
-		self.BaseSpeed = 0
 		self.VibeSpeed = 0
 		self.RotrSpeed = 0
 		self.AirSpeed = 0
@@ -290,14 +289,23 @@ class HealslutMaster(Frame):
 				self.AirSpeed -= 1
 			self.AirSpeed  = 0 if self.AirSpeed  <  0 else 3   if self.AirSpeed  >  3   else self.AirSpeed
 		def vibeloop():
+			i = 0
 			try:
 				if not self.c_Vibe.poll():
+					base_speed = 0
 					if self.hyp_game.get() == 'OW':
 						im = screenshot()
-						self.markslist, self.BaseSpeed = OWVibe.go(self.Positions,self.markslist,im)
-						OWKillfeedMonitor.Main(im,self.KillFeedFiles,
-											self.HSSub.get(),self.HSDom.get(),self.Cords,
-											self.c_killfeed,self.KillFeedPath,self.BorderPixels)
+						
+						# Get on-fire meter
+						on_fire_percentage = ow_on_fire_monitor.get_on_fire_value(im)
+						base_speed = round(on_fire_percentage * 100)
+
+						# Get killfeed
+						if i % 2 == 0: # This takes a lot of CPU, so only do it every other time
+							OWKillfeedMonitor.Main(im,self.KillFeedFiles,
+												self.HSSub.get(),self.HSDom.get(),self.Cords,
+												self.c_killfeed,self.KillFeedPath,self.BorderPixels)
+
 						if self.p_killfeed.poll() == True:
 							self.HandleCycles(self.KillfeedCycleDict[self.p_killfeed.recv()])
 					if self.hyp_game.get() == 'LoL':
@@ -308,9 +316,9 @@ class HealslutMaster(Frame):
 							self.HandleCycles(self.KillfeedCycleDict[self.p_killfeed.recv()])
 					#if self.hyp_game.get() == 'WoW':
 						#Stuff
-					vibespeed = self.BaseSpeed+self.VibeSpeed
-					rotrspeed = self.BaseSpeed+self.RotrSpeed
-					if self.BaseSpeed > 70: self.p_wordknt.send(6)
+					vibespeed = base_speed + self.VibeSpeed
+					rotrspeed = base_speed + self.RotrSpeed
+					if base_speed > 70: self.p_wordknt.send(6)
 					else:					self.p_wordknt.send(self.wordcountInt)
 					CheckDecay()
 					print('Vibe: %s, Rotate: %s'%(vibespeed,rotrspeed), end="\r")
@@ -320,25 +328,16 @@ class HealslutMaster(Frame):
 						if self.OverlayActive and not self.c_Vibe.poll():	#a chance to break midway through
 							Thread(target=HP.DoRequest, args=(url,1)).start()	
 					if self.OverlayActive:
-						self.after(2500, vibeloop)
+						i += 1
+						self.after(1100, vibeloop)
 			except Exception as e:
-				HP.HandleError(format_exc(2), e, 'vibeloop', subj='')	
-		def SelectLoop():
-			xFound = OWVibe.CheckLoadingScreen(self.p_CharSelect)
-			if self.OverlayActive:
-				if xFound == True:
-					print('Found it')
-					self.after(300000, SelectLoop)
-				else:
-					self.after(500, SelectLoop)
+				HP.HandleError(format_exc(2), e, 'vibeloop', subj='')
 		# ################################# #
 		try:	
 			if HSDEBUG: print('Clearing Vibe Pipe')
 			while self.c_Vibe.poll() == True:
 				self.c_Vibe.recv()
 			if self.hyp_game.get() == 'OW':
-				self.markslist = [0,0,0,0]
-				self.Positions = OWVibe.GenPositions()
 				self.Cords, self.BorderPixels = OWKillfeedMonitor.GenCords(self)
 				if self.Freeplay.get() == True:
 					self.KillFeedFiles = glob(self.KillFeedPath+'*.png')
@@ -351,7 +350,6 @@ class HealslutMaster(Frame):
 					]
 			if HSDEBUG: print('Launching vibeloop')
 			vibeloop()
-			#SelectLoop()	#$ character select loop, will be used with banner one day
 		except Exception as e:
 			HP.HandleError(format_exc(2), e, 'LaunchVibe', subj='')
 
@@ -1104,7 +1102,7 @@ class StartHypnoProcess(Process):
 def go():
 	try:
 		HP.VersionCheck()
-		ShowWindow(GetForegroundWindow(), SW_MINIMIZE)
+		# ShowWindow(GetForegroundWindow(), SW_MINIMIZE)
 		root = Tk()
 		root.geometry('%dx%d+%d+%d' % HP.CenterWindow(root, 50, 275))
 		root.wm_attributes("-topmost", 1)

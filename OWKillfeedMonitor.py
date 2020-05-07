@@ -143,8 +143,8 @@ def Main(im,Files,Sub,Dom,Cords,c_killfeed,KFPath,BorderPixels,Debug=False):
 		last_feed_items.pop(0)
 
 	# Console output
-	for feed_item in unique_feed_items:
-		print('feed', feed_item)
+	# for feed_item in unique_feed_items:
+	# 	print('feed', feed_item)
 
 	# Fire events
 	for feed_item in unique_feed_items:
